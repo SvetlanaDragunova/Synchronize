@@ -1,9 +1,6 @@
 
 package synchronize;
 
-import java.io.File;
-import java.util.Iterator;
-import java.util.TreeSet;
 
 /**
  * Главный класс синхронизации

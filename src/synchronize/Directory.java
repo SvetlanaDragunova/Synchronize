@@ -7,6 +7,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -21,7 +22,7 @@ import java.util.logging.Logger;
  * Класс директории
  * @author Svetlana
  */
-public class Directory<P> {
+public class Directory<P> implements Serializable{
     private P path;
     private TreeSet<FileInfo> prevState, newState;
     
@@ -125,13 +126,14 @@ public class Directory<P> {
         takeNewState((String)path, newState);
     }
     
+    
     /**
      * Метод для синхронизации
      * Разбивает обе директории на состоавные части(есть только в этой директории, есть в обеих директориях)
      * Для каждой из частей запускает свой метод для синхронизации
      * @param other директория, с кторой синхронизируется данная директория
      */
-    public void letsSinchronize(Directory other){
+    public void letsSinchronize(Directory other, TreeSet<FileInfo> toDeleteServer, TreeSet<FileInfo> toAddServer, TreeSet<FileInfo> toCopyServer, TreeSet<FileInfo> toDeleteClient, TreeSet<FileInfo> toAddClient, TreeSet<FileInfo> toCopyClient){
         //TreeSet <FileInfo> onlyNewMe = new TreeSet<FileInfo>();
         //TreeSet <FileInfo> onlyNewOther = new TreeSet<FileInfo>();
         TreeSet <FileInfo> hasOnlyMe = new TreeSet<FileInfo>();
@@ -158,9 +160,9 @@ public class Directory<P> {
         hasBothOther.addAll(other.newState);
         hasBothOther.retainAll(newState);
         
-        SyncByHaving(this, other, hasOnlyMe);
-        SyncByHaving(other, this, hasOnlyOther);
-        SyncByTime(this, other, hasBothMe, hasBothOther );
+        SyncByHaving(this, other, hasOnlyMe, toAddClient, toDeleteServer);
+        SyncByHaving(other, this, hasOnlyOther, toAddServer, toDeleteClient);
+        SyncByTime(this, other, hasBothMe, hasBothOther, toCopyServer, toCopyClient);
     }
 
     /**
@@ -171,7 +173,7 @@ public class Directory<P> {
      * @param hasFirst множество файлов, которые есть в обеих директориях, из первой директории
      * @param hasSecond множество файлов, которые есть в обеих директориях, из второй директории
      */
-    public void SyncByTime(Directory first, Directory second, TreeSet<FileInfo> hasFirst, TreeSet<FileInfo> hasSecond) {
+    public void SyncByTime(Directory first, Directory second, TreeSet<FileInfo> hasFirst, TreeSet<FileInfo> hasSecond, TreeSet<FileInfo> toCopyServer, TreeSet<FileInfo> toCopyClient ) {
         Iterator it1 = hasFirst.iterator();
         Iterator it2 = hasSecond.iterator();
         
@@ -187,17 +189,14 @@ public class Directory<P> {
                     it2.remove();
                 } else if(info1.equals(info2)){
                     if((long)info1.getTime()>(long)info2.getTime()){
-                        try {
-                            Files.copy(Paths.get((String)first.getPath(), File.separator,(String)info1.getPath()),Paths.get((String)second.path, File.separator,(String)info2.getPath()),REPLACE_EXISTING);
-                        } catch (IOException ex) {
-                            Logger.getLogger(Directory.class.getName()).log(Level.SEVERE, null, ex);
-                        }
+                        
+                            toCopyClient.add(info1);
+                            //Files.copy(Paths.get((String)first.getPath(), File.separator,(String)info1.getPath()),Paths.get((String)second.path, File.separator,(String)info2.getPath()),REPLACE_EXISTING);
+                            
                     } else{
-                        try {
-                            Files.copy(Paths.get((String)second.getPath(), File.separator,(String)info2.getPath()),Paths.get((String)first.path, File.separator,(String)info1.getPath()),REPLACE_EXISTING);
-                        } catch (IOException ex) {
-                            Logger.getLogger(Directory.class.getName()).log(Level.SEVERE, null, ex);
-                        }
+                            toCopyServer.add(info2);
+                            //Files.copy(Paths.get((String)second.getPath(), File.separator,(String)info2.getPath()),Paths.get((String)first.path, File.separator,(String)info1.getPath()),REPLACE_EXISTING);
+                        
                     }
                     it1.remove();
                     it2.remove();
@@ -215,29 +214,26 @@ public class Directory<P> {
      * @param second вторая директория
      * @param hasFirst множество файлов, которые есть только в первой директории
      */
-    public void SyncByHaving(Directory first, Directory second, TreeSet<FileInfo> hasFirst)  {
+    public void SyncByHaving(Directory first, Directory second, TreeSet<FileInfo> hasFirst, TreeSet<FileInfo> toAddSecond, TreeSet<FileInfo> toDeleteFirst)  {
         Iterator it1 = hasFirst.descendingIterator();
         FileInfo info1;
         while(it1.hasNext()){
             info1 = (FileInfo)it1.next();
             if(second.getPrevState().contains(info1)){
-                try {
-                    Files.delete(Paths.get((String)first.getPath()+ File.separator+(String)info1.getPath()));
+                    toDeleteFirst.add(info1);
+                   // Files.delete(Paths.get((String)first.getPath()+ File.separator+(String)info1.getPath()));
                     it1.remove();
-                } catch (IOException ex) { 
-            }
+               
         }
         }
         it1 = hasFirst.iterator();
         while(it1.hasNext()){
             info1 = (FileInfo)it1.next();
             if(!second.getPrevState().contains(info1)){
-                try {
-                    Files.copy(Paths.get((String)first.getPath()+File.separator+(String)info1.getPath()),Paths.get((String)second.path+ File.separator+(String)info1.getPath()));
+                    toAddSecond.add(info1);
+                    //Files.copy(Paths.get((String)first.getPath()+File.separator+(String)info1.getPath()),Paths.get((String)second.path+ File.separator+(String)info1.getPath()));
                     it1.remove();
-                } catch (IOException ex) {
-                   
-                }
+                
             }
         }
         
