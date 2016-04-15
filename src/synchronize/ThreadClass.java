@@ -1,13 +1,12 @@
 
 package synchronize;
 
-import java.io.File;
-
 
 /**
- *
+ * Класс, запускающий синхронизацию, запуская потоки сервера и клиента
  * @author Svetlana
  */
+
 public class ThreadClass implements Runnable{
     public static Config Config;
     

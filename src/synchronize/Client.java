@@ -5,12 +5,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
 import java.util.TreeSet;
-
-
-/**
- *
- * @author Svetlana
- */
 import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -26,6 +20,10 @@ import java.nio.file.Paths;
 import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+/**
+ *
+ * @author Svetlana
+ */
 
 /**
  * Класс реализует Client Socket.
@@ -33,9 +31,17 @@ import java.util.logging.Logger;
  * метод run(), который выполняется при запуске потока.
  */
 public class Client extends Thread {
-    
+    /*
+    * Хост клиента
+    */
     private String host;
+    /*
+    * Порт клиента
+    */
     private int port;
+    /*
+    * Конфигурация синхронизации
+    */
     public static Config Config;
     
     public Client(Config Config) {
@@ -136,6 +142,12 @@ public class Client extends Thread {
         }
     }
     
+    /**
+     * Метод, который получает файл из входящего потока и сохраняет его в директорию
+     * @param objectIn входящий поток
+     * @param dirToSave директория для сохранения
+     * @param fi информация о файле
+     */
     public void getFile(DataInputStream objectIn, Directory dirToSave, FileInfo fi){
         File file = new File(dirToSave.getPath()+File.separator+(String)fi.getPath());
         if ((boolean)fi.isDirectory()) {
@@ -169,8 +181,13 @@ public class Client extends Thread {
          }
      }
     
-    
-    protected void sendFile(DataOutputStream os, Directory dir, FileInfo fi) {
+    /**
+     * Метод, отправляющий файл из директории по исходящему потоку
+     * @param os исходящий поток
+     * @param dir директория, из которой отправляется файл
+     * @param fi информация о файле
+     */
+    public void sendFile(DataOutputStream os, Directory dir, FileInfo fi) {
         if (!(boolean)fi.isDirectory()) {
             try (FileInputStream is = new FileInputStream(dir.getPath()+File.separator+(String)fi.getPath());) {
                 File file = new File(dir.getPath()+File.separator+(String)fi.getPath());

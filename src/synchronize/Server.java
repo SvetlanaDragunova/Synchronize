@@ -1,16 +1,13 @@
 
 package synchronize;
 
-import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -20,9 +17,6 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Iterator;
-import java.util.Scanner;
-import java.util.Set;
 import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -38,8 +32,13 @@ import java.util.logging.Logger;
  * метод run(), который выполняется при запуске потока.
  */
 public class Server extends Thread {
-    
+    /*
+    * Порт сервера
+    */
     private int port;
+    /*
+    * Конфигурация синхронизации
+    */
      public static Config Config;
     
     public Server(Config Config) {
@@ -152,7 +151,12 @@ public class Server extends Thread {
             }
         }
     }
-
+    /**
+     * Метод, который получает файл из входящего потока и сохраняет его в директорию
+     * @param objectIn входящий поток
+     * @param dirToSave директория для сохранения
+     * @param fi информация о файле
+     */
     public void getFile(DataInputStream objectIn, Directory dirToSave, FileInfo fi){
         File file = new File(dirToSave.getPath()+File.separator+(String)fi.getPath());
         if ((boolean)fi.isDirectory()) {
@@ -186,8 +190,13 @@ public class Server extends Thread {
              }
          }
      }
-    
-     protected void sendFile(DataOutputStream os, Directory dir, FileInfo fi) {
+    /**
+     * Метод, отправляющий файл из директории по исходящему потоку
+     * @param os исходящий поток
+     * @param dir директория, из которой отправляется файл
+     * @param fi информация о файле
+     */
+     public void sendFile(DataOutputStream os, Directory dir, FileInfo fi) {
         if (!(boolean)fi.isDirectory()) {
             try (FileInputStream is = new FileInputStream(dir.getPath()+File.separator+(String)fi.getPath());) {
                 File file = new File(dir.getPath()+File.separator+(String)fi.getPath());

@@ -39,42 +39,6 @@ public class Synchronize {
     
     
     public static void main(String[] args) {
-//        Directory first = new Directory("C:\\Users\\Зщльзователь\\Desktop\\ТП\\first");
-//        Directory second = new Directory("C:\\Users\\Зщльзователь\\Desktop\\ТП\\second");
-//        File firFile = new File("C:\\Users\\Зщльзователь\\Desktop\\ТП\\first\\try1.txt");
-//        first.takePrevState(firFile);
-//        File secFile = new File("C:\\Users\\Зщльзователь\\Desktop\\ТП\\second\\try1.txt");
-//        second.takePrevState(secFile);
-//        first.putNewStateInSet();
-//        second.putNewStateInSet();
-//        Iterator it = first.getPrevState().iterator();
-//        Iterator it1 = first.getNewState().iterator();
-//        Iterator it2 = second.getPrevState().iterator();
-//        Iterator it3 = second.getNewState().iterator();
-//        while(it.hasNext()){
-//            FileInfo a = (FileInfo)it.next();
-//            System.out.print(a.getPath()+" ");
-//        }
-//        System.out.println(" ");
-//        while(it1.hasNext()){
-//            FileInfo a = (FileInfo)it1.next();
-//            System.out.print(a.getPath()+" ");
-//        }
-//        System.out.println(" ");
-//        while(it2.hasNext()){
-//            FileInfo a = (FileInfo)it2.next();
-//            System.out.print(a.getPath()+" ");
-//        }
-//        System.out.println(" "); 
-//        while(it3.hasNext()){
-//            FileInfo a = (FileInfo)it3.next();
-//            System.out.print(a.getPath()+" ");
-//        }
-//        System.out.println(" ");
-//        
-//        System.out.println(" ");
-//        first.letsSinchronize(second);
-
           if ((getPropetiesToUse(args))&&(Config!=null)) {            
             ThreadClass syncThread = new ThreadClass(Config);
             syncThread.run();

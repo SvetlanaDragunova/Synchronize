@@ -8,15 +8,9 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.nio.file.DirectoryNotEmptyException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import java.util.Iterator;
 import java.util.TreeSet;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Класс директории
@@ -129,9 +123,15 @@ public class Directory<P> implements Serializable{
     
     /**
      * Метод для синхронизации
-     * Разбивает обе директории на состоавные части(есть только в этой директории, есть в обеих директориях)
+     * Разбивает обе директории на составные части(есть только в этой директории, есть в обеих директориях)
      * Для каждой из частей запускает свой метод для синхронизации
-     * @param other директория, с кторой синхронизируется данная директория
+     * @param other директория, с которой синхронизируется данная директория
+     * @param toDeleteServer список файлов, которые необходимо удалить с сервера
+     * @param toAddServer список файлов, которые необходимо добавить на сервер
+     * @param toCopyServer список файлов, которые необходимо скопировать на сервер
+     * @param toCopyClient список файлов, которые необходимо скопировать на клиент
+     * @param toAddClient список файлов, которые необходимо добавить на клиент
+     * @param toDeleteClient список файлов, которые необходимо удалить с клиента
      */
     public void letsSinchronize(Directory other, TreeSet<FileInfo> toDeleteServer, TreeSet<FileInfo> toAddServer, TreeSet<FileInfo> toCopyServer, TreeSet<FileInfo> toDeleteClient, TreeSet<FileInfo> toAddClient, TreeSet<FileInfo> toCopyClient){
         //TreeSet <FileInfo> onlyNewMe = new TreeSet<FileInfo>();
@@ -141,12 +141,6 @@ public class Directory<P> implements Serializable{
         TreeSet <FileInfo> hasBothMe = new TreeSet<FileInfo>();
         TreeSet <FileInfo> hasBothOther = new TreeSet<FileInfo>();
         
-        
-        //onlyNewMe.addAll(newState);
-        //onlyNewMe.removeAll(prevState);
-        
-        //onlyNewOther.addAll(other.newState);
-        //onlyNewOther.removeAll(other.prevState);
         
         hasOnlyMe.addAll(newState);
         hasOnlyMe.removeAll(other.newState);
@@ -172,6 +166,8 @@ public class Directory<P> implements Serializable{
      * @param second вторая директория
      * @param hasFirst множество файлов, которые есть в обеих директориях, из первой директории
      * @param hasSecond множество файлов, которые есть в обеих директориях, из второй директории
+     * @param toCopyServer список файлов, которые необходимо скопировать на сервер
+     * @param toCopyClient список файлов, которые необходимо скопировать на клиент
      */
     public void SyncByTime(Directory first, Directory second, TreeSet<FileInfo> hasFirst, TreeSet<FileInfo> hasSecond, TreeSet<FileInfo> toCopyServer, TreeSet<FileInfo> toCopyClient ) {
         Iterator it1 = hasFirst.iterator();
@@ -189,14 +185,9 @@ public class Directory<P> implements Serializable{
                     it2.remove();
                 } else if(info1.equals(info2)){
                     if((long)info1.getTime()>(long)info2.getTime()){
-                        
                             toCopyClient.add(info1);
-                            //Files.copy(Paths.get((String)first.getPath(), File.separator,(String)info1.getPath()),Paths.get((String)second.path, File.separator,(String)info2.getPath()),REPLACE_EXISTING);
-                            
                     } else{
                             toCopyServer.add(info2);
-                            //Files.copy(Paths.get((String)second.getPath(), File.separator,(String)info2.getPath()),Paths.get((String)first.path, File.separator,(String)info1.getPath()),REPLACE_EXISTING);
-                        
                     }
                     it1.remove();
                     it2.remove();
@@ -213,6 +204,8 @@ public class Directory<P> implements Serializable{
      * @param first первая директория
      * @param second вторая директория
      * @param hasFirst множество файлов, которые есть только в первой директории
+     * @param toAddSecond список файлов, которые необходимо добавить в первую директорию
+     * @param toDeleteFirst список файлов, которые необходимо удалить из второй директории
      */
     public void SyncByHaving(Directory first, Directory second, TreeSet<FileInfo> hasFirst, TreeSet<FileInfo> toAddSecond, TreeSet<FileInfo> toDeleteFirst)  {
         Iterator it1 = hasFirst.descendingIterator();
@@ -221,7 +214,6 @@ public class Directory<P> implements Serializable{
             info1 = (FileInfo)it1.next();
             if(second.getPrevState().contains(info1)){
                     toDeleteFirst.add(info1);
-                   // Files.delete(Paths.get((String)first.getPath()+ File.separator+(String)info1.getPath()));
                     it1.remove();
                
         }
@@ -231,7 +223,6 @@ public class Directory<P> implements Serializable{
             info1 = (FileInfo)it1.next();
             if(!second.getPrevState().contains(info1)){
                     toAddSecond.add(info1);
-                    //Files.copy(Paths.get((String)first.getPath()+File.separator+(String)info1.getPath()),Paths.get((String)second.path+ File.separator+(String)info1.getPath()));
                     it1.remove();
                 
             }
