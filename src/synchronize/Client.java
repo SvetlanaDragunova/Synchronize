@@ -17,6 +17,9 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.rmi.NotBoundException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -43,11 +46,15 @@ public class Client extends Thread {
     * Конфигурация синхронизации
     */
     public static Config Config;
+    Directory clientDir;
     
     public Client(Config Config) {
         this.host = Config.getProperty("host");
         this.port = Integer.valueOf(Config.getProperty("port"));
         this.Config = Config;
+        clientDir = new Directory(Config.getProperty("firstpath"));
+        clientDir.takePrevState(new File(Config.getProperty("firstprevstate")));
+        clientDir.putNewStateInSet();
     }
     
     @Override
@@ -58,20 +65,29 @@ public class Client extends Thread {
         ObjectOutputStream objectOut = null;
         Scanner stdin = null;
         ObjectInputStream objectIn = null;
+        RMIInterface serverService = null;
+         
+
         try {
             System.out.println("CLIENT:Connecting to " + host + ":" + port);
-            fromserver = new Socket(host, port);
+                       
+            System.out.println("CLIENT:Authorizing...");
+            Users_TP user = new Users_TP(Config.getProperty("login"),Config.getProperty("password"));   
+            
+            Registry registry = LocateRegistry.getRegistry(Config.getProperty("host"), Integer.valueOf(Config.getProperty("port")));
+            serverService = (RMIInterface) registry.lookup("RMIService");
+            boolean auth = serverService.authorization(user);
+        
+            if (auth) {  
+            System.out.println("Authorization passed");
+            System.out.println("Start processing...");
+            serverService.sync(clientDir);        
+            fromserver = new Socket(host, port+5);
             objectOut = new ObjectOutputStream(fromserver.getOutputStream());
             objectIn = new ObjectInputStream(fromserver.getInputStream());
             in = new BufferedReader(new InputStreamReader(fromserver.getInputStream()));
             out = new PrintWriter(fromserver.getOutputStream(), true);
             stdin = new Scanner(System.in);
-            
-            System.out.println("CLIENT:Sending information to server...");
-            Directory clientDir = new Directory(Config.getProperty("firstpath"));
-            clientDir.putNewStateInSet();
-            clientDir.takePrevState(new File(Config.getProperty("firstprevstate")));
-            objectOut.writeObject(clientDir);
             
             TreeSet<FileInfo> toDelete = (TreeSet)objectIn.readObject();
             //System.out.println(toDelete.size());
@@ -116,19 +132,13 @@ public class Client extends Thread {
                 getFile(obj,clientDir, fi);
             } 
             System.out.println("CLIENT:Files copied");
-            System.out.println("Synchronization finished! Now you can talk to our server. Say 'thanks' to exit!");
-            String fuser, fserver;
-            while ((fuser = stdin.nextLine()) != null) {
-                out.println(fuser);
-                fserver = in.readLine();
-                System.out.println(fserver);
-                if (fuser.equalsIgnoreCase("thanks")) {
-                    break;
+            clientDir.putNewStateInSet();
+            clientDir.saveNewState(new File(Config.getProperty("firstprevstate")));
+            System.out.println("Synchronization finished!");
+        } else{
+        System.out.println("Authorization failed! Please check your login/password!");
                 }
-            }
-        } catch (IOException ex) {
-            Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (ClassNotFoundException ex) {
+        } catch (IOException | ClassNotFoundException | NotBoundException ex) {
             Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
         } finally {
             try {
@@ -138,10 +148,12 @@ public class Client extends Thread {
                 fromserver.close();
             } catch (IOException ex) {
                 // ignore
-            }
+            }catch (NullPointerException ex) {
+            //ignore
         }
-    }
+        }
     
+    }
     /**
      * Метод, который получает файл из входящего потока и сохраняет его в директорию
      * @param objectIn входящий поток
@@ -209,7 +221,11 @@ public class Client extends Thread {
                 System.out.println("sending has been finished*");
             } catch (IOException ex) {
                 Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-            }
+            }catch (NullPointerException ex) {
+            //ignore
+        }
          }
      }
+    
+ 
 }

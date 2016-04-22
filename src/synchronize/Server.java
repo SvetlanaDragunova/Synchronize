@@ -12,14 +12,21 @@ import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
+import java.io.Serializable;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.rmi.RemoteException;
+import java.rmi.registry.Registry;
+import java.rmi.registry.LocateRegistry;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.persistence.*;
 
 /**
  *
@@ -31,7 +38,8 @@ import java.util.logging.Logger;
  * Класс создан на основе класса Thread и для работы с ним необходимо перегрузить
  * метод run(), который выполняется при запуске потока.
  */
-public class Server extends Thread {
+public class Server extends Thread implements Serializable {
+    
     /*
     * Порт сервера
     */
@@ -40,10 +48,14 @@ public class Server extends Thread {
     * Конфигурация синхронизации
     */
      public static Config Config;
-    
+     Directory serverDir;
+     
     public Server(Config Config) {
         this.port = Integer.valueOf(Config.getProperty("port"));
         this.Config = Config;
+        serverDir = new Directory(Config.getProperty("secondpath"));
+        serverDir.takePrevState(new File(Config.getProperty("secondprevstate")));
+        serverDir.putNewStateInSet();
     }
     
     @Override
@@ -55,90 +67,102 @@ public class Server extends Thread {
         ObjectInputStream objectIn = null;
         ObjectOutputStream objectOut = null;
         try {
-            server = new ServerSocket(port);
+            
+            System.out.println("SERVER:Authorizing...");
+            String serviceName = "RMIService";
+            Registry reg = null;
+            try {
+                reg = LocateRegistry.createRegistry(Integer.valueOf(Config.getProperty("port")));
+            } catch (RemoteException ex) {
+                Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        
+        while (true) {
+            TreeSet<FileInfo> toAddServer = null;
+            TreeSet<FileInfo> toDeleteServer = null; 
+            TreeSet<FileInfo> toCopyServer = null;
+            TreeSet<FileInfo> toAddClient = null;
+            TreeSet<FileInfo> toDeleteClient = null; 
+            TreeSet<FileInfo> toCopyClient = null;
+            RMIInterface serverService = null;
+
+            try {                   
+                serverService = new SyncRMI();
+                serverService.setServer(this);
+                serverService.setServerDir(serverDir);
+                reg.rebind(serviceName, serverService);
+            } catch (RemoteException ex) {
+                Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            // Сервер ждет, пока SyncRMI не выполнит метод поиска изменений и не "включит" сервер
+            suspend();  
+            try {
+                toAddClient = serverService.getToAddClient();
+                toDeleteClient = serverService.getToDeleteClient();
+                toCopyClient = serverService.getToCopyClient();
+                toAddServer = serverService.getToAddServer();
+                toDeleteServer = serverService.getToDeleteServer();
+                toCopyServer = serverService.getToCopyServer();
+            } catch (RemoteException ex) {
+                Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            server = new ServerSocket(port+5);
             fromclient = server.accept();
-            in = new BufferedReader(new InputStreamReader(
-                    fromclient.getInputStream()));
+            in = new BufferedReader(new InputStreamReader(fromclient.getInputStream()));
             out = new PrintWriter(fromclient.getOutputStream(), true);
             objectIn = new ObjectInputStream(fromclient.getInputStream());
             objectOut = new ObjectOutputStream(fromclient.getOutputStream());
-            Directory clientDir = (Directory)objectIn.readObject();
-            System.out.println("SERVER:Got information from client!");
-            //System.out.println(clientDyr.getPath());
-            Directory serverDir = new Directory(Config.getProperty("secondpath"));
-            serverDir.putNewStateInSet();
-            serverDir.takePrevState(new File(Config.getProperty("secondprevstate")));
-            System.out.println("SERVER:Searching for changes...");
-            TreeSet<FileInfo> toAddClient = new TreeSet<>();
-            TreeSet<FileInfo> toDeleteClient = new TreeSet<>();
-            TreeSet<FileInfo> toCopyClient = new TreeSet<>();
-            TreeSet<FileInfo> toAddServer = new TreeSet<>();
-            TreeSet<FileInfo> toDeleteServer = new TreeSet<>();
-            TreeSet<FileInfo> toCopyServer = new TreeSet<>();
-            
-            serverDir.letsSinchronize(clientDir, toDeleteServer, toAddServer, toCopyServer, toDeleteClient, toAddClient, toCopyClient);
-            
-            //System.out.println(toDeleteServer.size());
-            System.out.println("SERVER:Got the changes!");
-            
-            System.out.println("SERVER:Deleting files from server...");
-            for(FileInfo a:toDeleteServer){
-                Files.delete(Paths.get((String)serverDir.getPath()+ File.separator+(String)a.getPath()));
-            }
-            System.out.println("SERVER:Deleted successfully!");
-            
-            System.out.println("SERVER:Sending client set of files to be deleted...");
-            objectOut.writeObject(toDeleteClient);
-            
-            objectOut.writeObject(toAddServer);
-            DataInputStream obj = new DataInputStream(fromclient.getInputStream());
-            for(FileInfo fi:toAddServer){
-                getFile(obj,serverDir, fi);
-            } 
-            System.out.println("SERVER:Files added");
-            DataOutputStream fileOut = new DataOutputStream(fromclient.getOutputStream());
-            System.out.println("SERVER:Sending client set of files to be added...");
-            objectOut.writeObject(toAddClient);
-            
-            System.out.println("SERVER:Sending files to client to be added");
-            
-            for(FileInfo a:toAddClient){
-                //objectOut.writeObject(new File((String) a.getPath()));
-                sendFile(fileOut,serverDir,a);
-            }
-            
-            objectOut.writeObject(toCopyServer);
-            
-            
-            
-            for(FileInfo fi:toCopyServer){
-                getFile(obj,serverDir, fi);
-            } 
-            System.out.println("SERVER:Files copied");
-            
-            System.out.println("SERVER:Sending client set of files to be copied...");
-            objectOut.writeObject(toCopyClient);
-            
-            System.out.println("SERVER:Sending files to client to be copied");
-            
-            for(FileInfo a:toCopyClient){
-                sendFile(fileOut,serverDir,a);
-            }
-            
-            serverDir.putNewStateInSet();
-            serverDir.saveNewState(new File(Config.getProperty("secondprevstate")));
-            
-            clientDir.putNewStateInSet();
-            clientDir.saveNewState(new File(Config.getProperty("firstprevstate")));
-            
-            String input;
-            while ((input = in.readLine()) != null) {
-                if (input.equalsIgnoreCase("thanks")) {
-                    break;
+                System.out.println("SERVER:Got the changes!");
+
+                System.out.println("SERVER:Deleting files from server...");
+                for(FileInfo a:toDeleteServer){
+                    Files.delete(Paths.get((String)serverDir.getPath()+ File.separator+(String)a.getPath()));
                 }
-                out.println("ECHO: " + input);
-            }
-        } catch (IOException | ClassNotFoundException ex) {
+                System.out.println("SERVER:Deleted successfully!");
+
+                System.out.println("SERVER:Sending client set of files to be deleted...");
+                objectOut.writeObject(toDeleteClient);
+
+                objectOut.writeObject(toAddServer);
+                DataInputStream obj = new DataInputStream(fromclient.getInputStream());
+                for(FileInfo fi:toAddServer){
+                    getFile(obj,serverDir, fi);
+                } 
+                System.out.println("SERVER:Files added");
+                DataOutputStream fileOut = new DataOutputStream(fromclient.getOutputStream());
+                System.out.println("SERVER:Sending client set of files to be added...");
+                objectOut.writeObject(toAddClient);
+
+                System.out.println("SERVER:Sending files to client to be added");
+
+                for(FileInfo a:toAddClient){
+                    //objectOut.writeObject(new File((String) a.getPath()));
+                    sendFile(fileOut,serverDir,a);
+                }
+
+                objectOut.writeObject(toCopyServer);
+
+
+
+                for(FileInfo fi:toCopyServer){
+                    getFile(obj,serverDir, fi);
+                } 
+                System.out.println("SERVER:Files copied");
+
+                System.out.println("SERVER:Sending client set of files to be copied...");
+                objectOut.writeObject(toCopyClient);
+
+                System.out.println("SERVER:Sending files to client to be copied");
+
+                for(FileInfo a:toCopyClient){
+                    sendFile(fileOut,serverDir,a);
+                }
+
+                serverDir.putNewStateInSet();
+                serverDir.saveNewState(new File(Config.getProperty("secondprevstate")));
+                
+        }
+        } catch (IOException ex) {
             Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
         } finally {
             try {
