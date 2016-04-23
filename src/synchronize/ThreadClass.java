@@ -23,8 +23,10 @@ public class ThreadClass implements Runnable{
         Thread s = new Server(Config);
         // запуск потока экземпляра класса Server
         s.start();
-        Thread c = new Client(Config);
-        // запуск потока экземпляра класса Client
-        c.start();
+        UserFrame frame = new UserFrame(Config);
+        frame.setVisible(true);
+//        Thread c = new Client(Config);
+//        // запуск потока экземпляра класса Client
+//        c.start();
     }    
 }

@@ -47,14 +47,16 @@ public class Client extends Thread {
     */
     public static Config Config;
     Directory clientDir;
+    UserFrame frame;
     
-    public Client(Config Config) {
+    public Client(Config Config, UserFrame frame) {
         this.host = Config.getProperty("host");
         this.port = Integer.valueOf(Config.getProperty("port"));
         this.Config = Config;
         clientDir = new Directory(Config.getProperty("firstpath"));
         clientDir.takePrevState(new File(Config.getProperty("firstprevstate")));
         clientDir.putNewStateInSet();
+        this.frame = frame;
     }
     
     @Override
@@ -70,7 +72,7 @@ public class Client extends Thread {
 
         try {
             System.out.println("CLIENT:Connecting to " + host + ":" + port);
-                       
+            frame.changeProgress(5);
             System.out.println("CLIENT:Authorizing...");
             Users_TP user = new Users_TP(Config.getProperty("login"),Config.getProperty("password"));   
             
@@ -80,6 +82,7 @@ public class Client extends Thread {
         
             if (auth) {  
             System.out.println("Authorization passed");
+            frame.changeProgress(15);
             System.out.println("Start processing...");
             serverService.sync(clientDir);        
             fromserver = new Socket(host, port+5);
@@ -91,7 +94,7 @@ public class Client extends Thread {
             
             TreeSet<FileInfo> toDelete = (TreeSet)objectIn.readObject();
             //System.out.println(toDelete.size());
-            
+            frame.changeProgress(50);
             System.out.println("CLIENT:Got the set!");
             
             System.out.println("CLIENT:Deleting files from client...");
@@ -99,7 +102,7 @@ public class Client extends Thread {
                 Files.delete(Paths.get((String)clientDir.getPath()+ File.separator+(String)a.getPath()));
             }
             System.out.println("CLIENT:Deleted successfully!");
-            
+            frame.changeProgress(70);
             System.out.println("SERVERC:Sending client set of files to be added to server from client...");
             TreeSet<FileInfo> toSendServerToAdd = (TreeSet)objectIn.readObject();
             System.out.println("CLIENT:Got the set!");
@@ -115,7 +118,7 @@ public class Client extends Thread {
                 getFile(obj,clientDir, fi);
             } 
             System.out.println("CLIENT:Files added");
-            
+            frame.changeProgress(85);
             
             System.out.println("SERVERC:Sending client set of files to be copied to server from client...");
             TreeSet<FileInfo> toSendServerToCopy = (TreeSet)objectIn.readObject();
@@ -135,6 +138,7 @@ public class Client extends Thread {
             clientDir.putNewStateInSet();
             clientDir.saveNewState(new File(Config.getProperty("firstprevstate")));
             System.out.println("Synchronization finished!");
+            frame.syncCompleted();
         } else{
         System.out.println("Authorization failed! Please check your login/password!");
                 }
